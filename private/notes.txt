@@ -1,0 +1,84 @@
+
+Issue: WHen memory resolver is active - Weird error message
+[22376] 2025/07/18 12:30:53.765860 [DBG] 127.0.0.1:52333 - cid:5 - Authenticated JWT: Client "UAWWSIXPJUPS5Z4FN2V3E4S7DZCRAJGKY7H2ZKZNUE3A46UBGAXWAE3Y" (claim-name: "nsc temporary push user", claim-tags: []) signed with "AC67AVOPNGIXIKCNEZ6CO5F4XPBC6RKTHT2PEDTQ3TPGRGV6NC3IUEGN" by Account "AC67AVOPNGIXIKCNEZ6CO5F4XPBC6RKTHT2PEDTQ3TPGRGV6NC3IUEGN" (claim-name: "SYS", claim-tags: []) signed with "ODMJ6OGZV6S3SJCXPZCAE3HWGLLY3UYCSFU72UCGJ55N7HEU6V2XJ2Y7" has mappings false accused 0xc0001d8708
+
+--------------------
+
+Example Delegated:    
+    
+export PATH=./:$PATH    
+ln -s /cygdrive/d/tmp tmp
+cd /cygdrive/d/synadia/software/nsc
+
+Run generate.sh
+
+# the script will put things in /tmp/DA
+/cygdrive/d/private/nats.io_synadia/nats-server -c /tmp/DA/server.conf
+/cygdrive/d/synadia/software/nats-server/nats-server -D -c /tmp/DA/server.conf
+
+
+cd /cygdrive/d/private/nats.io_synadia/callout.go/examples/delegated
+# in another terminal run the callout service:
+go run delegated_example.go --creds /tmp/DA/service.creds --callout-issuer /tmp/DA/C.nk --issuer /tmp/DA/A.nk 
+
+cd /cygdrive/d/private/nats.io_synadia/callout.go/examples/delegated
+# in another terminal try - callout will reject user named 'bad'
+nats -s localhost:4222 --creds /tmp/DA/sentinel.creds --connection-name=bad pub hello hi
+nats: error: read tcp 127.0.0.1:51120->127.0.0.1:4222: i/o timeout
+
+# but work for any other connection
+nats -s localhost:4222 --creds /tmp/DA/sentinel.creds pub hello hi
+13:03:13 Published 2 bytes to "hello"
+
+--------------------
+
+Example dynamic accounts:    
+
+# the script will put things in /tmp/DA
+/cygdrive/d/private/nats.io_synadia/nats-server -D -c /tmp/DA/server.conf
+
+
+cd /cygdrive/d/private/nats.io_synadia/callout.go/examples/dynamic_accounts
+# in another terminal run the callout service:
+go run dynamic.go -operator-key /tmp/DA/operator.nk -sys /tmp/DA/sys.creds -callout-issuer /tmp/DA/C.nk -creds /tmp/DA/service.creds
+
+cd /cygdrive/d/private/nats.io_synadia/callout.go/examples/dynamic_accounts
+# in another terminal start client.go 
+# The -account-name parameter will be send as the  token in the client connection
+cd client
+go run client.go -account-name B -creds /tmp/DA/sentinel.creds
+
+{"server":{"name":"ND4SGVPVMOHYB3BISPYKWE3RUSILPCAFBV74AEFYFJBRWSXPN6FGKSGG","host":"0.0.0.0","id":"ND4SGVPVMOHYB3BISPYKWE3RUSILPCAFBV74AEFYFJBRWSXPN6FGKSGG","ver":"2.11.0-dev","jetstream":false,"flags":0,"seq":127,"time":"2025-02-04T20:30:09.615143Z"},"data":{"user":"B","account":"AADWDO5UGBLQT2MBC4NCUUHE34TG6KED47OHCPWWXTRHCFOKXGWTRO4F"}}
+
+# The only user allowed in with going through auth callout is service
+nats -s localhost:4222 --creds /tmp/DA/service.creds pub hello hi
+13:03:13 Published 2 bytes to "hello"
+
+--------------------
+
+Example Delegated default sentinel:    
+    
+export PATH=./:$PATH    
+ln -s /cygdrive/d/tmp tmp
+cd /cygdrive/d/synadia/software/nsc
+
+Run generate.sh
+
+# the script will put things in /tmp/DA
+/cygdrive/d/private/nats.io_synadia/nats-server -c /tmp/DA/server.conf
+
+cd /cygdrive/d/private/nats.io_synadia/callout.go/examples/delegated_default_sentinel
+# in another terminal run the callout service:
+go run delegated_default_sentinel.go --creds /tmp/DA/service.creds --callout-issuer /tmp/DA/C.nk --issuer /tmp/DA/A.nk 
+
+# in another terminal try - callout will allow connections if user name and password match
+nats -s localhost:4222 --user=ACME --password=ACME pub hello hi
+13:03:13 Published 2 bytes to "hello"
+
+# All other will be rejected
+nats -s localhost:4222 pub hello hi
+nats: error: read tcp 127.0.0.1:51120->127.0.0.1:4222: i/o timeout
+
+
+
+--------------------
